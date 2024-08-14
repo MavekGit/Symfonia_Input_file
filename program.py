@@ -7,6 +7,8 @@ import pprint
 import sys
 
 
+#TODO add comments
+
 def remove_quotes_from_dates(file_path):
 
     with open(file_path, 'r', encoding='utf-8') as file:
