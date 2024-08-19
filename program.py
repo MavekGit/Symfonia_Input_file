@@ -28,6 +28,7 @@ header = True
 
 MA_account = "135"
 WN_account = "202"
+documentNumber = "Brak zglosic do tworcy"
 
 
 
@@ -37,13 +38,14 @@ with open('e_dokum.txt', mode='w', newline='', encoding='utf-8') as file:
 
 
     for i, transaction in enumerate(transactions):
-            #pprint.pprint(transaction.data)        
+            pprint.pprint(transaction.data)        
             
+            # Pełna data wyciągu
             fileData = transaction.data.get('date')
             # fileData.strftime('%Y-%m-%d')
 
             
-            
+            # Numer wyciągu
             statement_number = str(transactions.data['statement_number'])
             sequence_number = str(transactions.data['sequence_number'])      
             statement_number_list = list(statement_number)
@@ -54,43 +56,78 @@ with open('e_dokum.txt', mode='w', newline='', encoding='utf-8') as file:
             else:
                  statement_number = statement_number
 
-            statement_number_sequence = str(statement_number + '/' + fileData.strftime('%Y'))
-            # BEZ WBP nagłówek bez pierwszego zera przykład 0045/2024
-            full_statement_number_sequence = statement_number_sequence
-            full_statement_number_sequence_description = "Wyciag bankowy nr " + statement_number_sequence
 
+            statement_number_sequence = str(statement_number + '/' + fileData.strftime('%Y'))
+            full_statement_number_sequence = statement_number_sequence
+            full_statement_number_sequence_description = "WBP" + statement_number_sequence
+
+            # Liczba porządkowa
             ordinalNumber = i + 1
             
+            # Faktury, nazwa firmy
             transactionDetails = transaction.data.get('transaction_details', '')
+
 
             isProwizjeAut = re.search(r"PROWIZJE AUT.", transactionDetails, re.DOTALL) if transactionDetails else None
 
-            if(isProwizjeAut):
-                WN_account = "408-1"
-
             
-            notExtractedInvoiceNumber = re.search(r"<21INV/(?P<Ivalue>.*?)\/TXT", transactionDetails, re.DOTALL) if transactionDetails else None
-
-            notExtractedTaxID = re.search(r"/IDC/(?P<Tvalue>.*?)/<21INV/", transactionDetails, re.DOTALL) if transactionDetails else None
-
+            # notExtractedInvoiceNumber = re.search(r"<21INV/(?P<Ivalue>.*?)\/TXT", transactionDetails, re.DOTALL) if transactionDetails else None
+            notExtractedInvoiceNumber = re.search(r"<20(?P<Ivalue>.*?)<30", transactionDetails, re.DOTALL) if transactionDetails else None
             invoiceNumber = notExtractedInvoiceNumber.group('Ivalue') if notExtractedInvoiceNumber else ''
-            TaxID = notExtractedTaxID.group('Tvalue') if notExtractedTaxID else ''               
-            
-            if(invoiceNumber):
-                documentNumber = invoiceNumber + " NIP " + TaxID
-            else:
-                 documentNumber = ''
 
+            # NIP
+            notExtractedTaxID = re.search(r"/IDC/(?P<Tvalue>.*?)<21(?:INV|/INV)", transactionDetails, re.DOTALL) if transactionDetails else None
+            TaxID = notExtractedTaxID.group('Tvalue') if notExtractedTaxID else ''                   
+            
+            
+            # Faktury wraz z przejściami do następnej linii
             descriptionFirstPartNotExtracted = re.search(r"<20(?P<DFPvalue>.*?)<30", transactionDetails, re.DOTALL) if transactionDetails else None
             descriptionFirstPart = descriptionFirstPartNotExtracted.group('DFPvalue') if descriptionFirstPartNotExtracted else ''
 
-            notExtractedDescription  = notExtractedTaxID = re.search(r"<32(?P<Dvalue>.*?)<38", transactionDetails, re.DOTALL) if transactionDetails else None
-            description = notExtractedDescription.group('Dvalue') if notExtractedDescription else ''
-            description = re.sub(r"<3[3-7]", '', description)
+            # Nazwa firmy z przejściami do następnej linii
+            notExtractedDescription  = re.search(r"<32(?P<Dvalue>.*?)<38", transactionDetails, re.DOTALL) if transactionDetails else None
+            companyName = notExtractedDescription.group('Dvalue') if notExtractedDescription else ''
+            # Usuń oznaczenia następnej linii
+            companyName = re.sub(r"<3[3-7]", '', companyName)
 
-            description =  str(description) + " " + str(descriptionFirstPart)
-            description = re.sub(r'\s+', ' ', description).strip()
+
+            # Numer dokumentu
+            if(isProwizjeAut):
+                documentNumber = "PROWIZJE AUT."
+                WN_account = "408-1"
+                
+            else:
+                documentNumber = companyName
+
+
+            # description =  str(companyName) + " " + str(descriptionFirstPart)
+       
+
+            if(TaxID):
+                # documentNumber = invoiceNumber + " NIP " + TaxID
+                invoiceNumberMatch = re.search(r"/TXT(?P<Fvalue>.*?)<30", transactionDetails, re.DOTALL)
+
+    
+                # Wyodrębnienie dopasowanej wartości z grupy
+                invoiceNumberRaw = invoiceNumberMatch.group('Fvalue') if invoiceNumberMatch else ''       
+
+          
+
+                invoiceNumberRaw = re.sub(r"/TXT", '', invoiceNumberRaw)
+                invoiceNumberRaw = re.sub(r"<2[0-7]", '', invoiceNumberRaw)
+
+                # print(invoiceNumberRaw)
+
+                description = invoiceNumberRaw + " " + TaxID + " " + companyName
+                pass
+            else:
+                invoiceNumberRaw = invoiceNumber
+                invoiceNumber = re.sub(r"<2[0-7]", '', invoiceNumber)
+                description = invoiceNumber + " " + companyName
+
+            # description = re.sub(r'\s+', ' ', description).strip()
             
+            # Kwota z jednostką
             amountwithUnit = str(transaction.data.get('amount'))
             # amount = re.search(r"[0-9]+.?[0-9]+", amountwithUnit) if amountwithUnit else None
             amount = re.search(r"\b\d+(?:\.\d+)?\b", amountwithUnit) if amountwithUnit else None
