@@ -148,7 +148,22 @@ with open('e_dokum.txt', mode='w', newline='', encoding='utf-8') as file:
                 header = False
 
 
-            writer.writerow(["ZAP", 'WN',amount,WN_account,documentNumber,0,description,0])
+            documentNumber = documentNumber.replace('\n', '').replace('\r', '')
+            description = description.replace('\n', '').replace('\r', '')
+
+            writer.writerow(["ZAP", 'WN',amount,WN_account,documentNumber,0,description,0])            
             writer.writerow(["ZAK", "MA",amount,MA_account,documentNumber,0,description,0])
+
+            # Tworzenie wierszy ZAP i ZAK
+            # zap_row = ";".join([str("ZAP"), 'WN', str(amount), str(WN_account), str(documentNumber), "0", str(description), "0"])
+            # zak_row = ";".join([str("ZAK"), 'MA', str(amount), str(MA_account), str(documentNumber), "0", str(description), "0"])
+
+            # zap_row = zap_row.replace('\n', '').replace('\r', '')
+            # zak_row = zak_row.replace('\n', '').replace('\r', '')
+
+            # # Zapisz ZAP i ZAK w jednej linii
+            # file.write(zap_row + '\n')  # Zapisujemy ZAP w jednej linii
+            # file.write(zak_row + '\n')  # Zapisujemy ZAK w jednej linii
+
 
 remove_quotes_from_dates('e_dokum.txt')
