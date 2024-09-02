@@ -28,7 +28,7 @@ header = True
 
 MA_account = "135"
 WN_account = "202"
-documentNumber = "Brak zglosic do tworcy"
+documentNumber = "Brak zglosic"
 
 
 
@@ -40,6 +40,9 @@ with open('e_dokum.txt', mode='w', newline='', encoding='utf-8') as file:
     for i, transaction in enumerate(transactions):
             pprint.pprint(transaction.data)        
             
+            MA_account = "135"
+            WN_account = "202"
+
             # Pełna data wyciągu
             fileData = transaction.data.get('date')
             # fileData.strftime('%Y-%m-%d')
@@ -69,6 +72,7 @@ with open('e_dokum.txt', mode='w', newline='', encoding='utf-8') as file:
 
 
             isProwizjeAut = re.search(r"PROWIZJE AUT.", transactionDetails, re.DOTALL) if transactionDetails else None
+            isPrzelewObciazenieVat = re.search(r"00PRZELEW PODZIELONY OBCIĄŻEN.*?", transactionDetails, re.DOTALL) if transactionDetails else None
 
             
             # notExtractedInvoiceNumber = re.search(r"<21INV/(?P<Ivalue>.*?)\/TXT", transactionDetails, re.DOTALL) if transactionDetails else None
@@ -89,18 +93,6 @@ with open('e_dokum.txt', mode='w', newline='', encoding='utf-8') as file:
             companyName = notExtractedDescription.group('Dvalue') if notExtractedDescription else ''
             # Usuń oznaczenia następnej linii
             companyName = re.sub(r"<3[3-7]", '', companyName)
-
-
-            # Numer dokumentu
-            if(isProwizjeAut):
-                documentNumber = "PROWIZJE AUT."
-                WN_account = "408-1"
-                
-            else:
-                documentNumber = companyName
-
-
-            # description =  str(companyName) + " " + str(descriptionFirstPart)
        
 
             if(TaxID):
@@ -111,12 +103,8 @@ with open('e_dokum.txt', mode='w', newline='', encoding='utf-8') as file:
                 # Wyodrębnienie dopasowanej wartości z grupy
                 invoiceNumberRaw = invoiceNumberMatch.group('Fvalue') if invoiceNumberMatch else ''       
 
-          
-
                 invoiceNumberRaw = re.sub(r"/TXT", '', invoiceNumberRaw)
                 invoiceNumberRaw = re.sub(r"<2[0-7]", '', invoiceNumberRaw)
-
-                # print(invoiceNumberRaw)
 
                 description = invoiceNumberRaw + " " + TaxID + " " + companyName
                 pass
@@ -132,38 +120,51 @@ with open('e_dokum.txt', mode='w', newline='', encoding='utf-8') as file:
             # amount = re.search(r"[0-9]+.?[0-9]+", amountwithUnit) if amountwithUnit else None
             amount = re.search(r"\b\d+(?:\.\d+)?\b", amountwithUnit) if amountwithUnit else None
 
-            is_amount_negative = re.search(r"-", amountwithUnit) if amountwithUnit else None
-
-            if(amountwithUnit and not is_amount_negative):
-                 MA_account = "201"
-                 WN_account = "135"
-                 
+            is_amount_negative = bool(re.search(r"-", amountwithUnit)) if amountwithUnit else False     
             
             amount = amount.group()
             amount = float(amount)
 
 
+            #ProwizjeAut
+            if(isProwizjeAut):
+                documentNumber = "PROWIZJE AUT."
+                MA_account = "135"
+                WN_account = "408-1"
+                
+            else:
+                documentNumber = companyName
+
+            #ObciazenieVat
+            if(isPrzelewObciazenieVat):
+                documentNumber = "OBCIĄŻENIE VAT"
+                MA_account = "144"
+                WN_account = "135"
+            else:
+                documentNumber = companyName
+
+            if(amountwithUnit and is_amount_negative):
+                 Temp_account =  MA_account
+                 MA_account = WN_account
+                 WN_account = Temp_account
+                 
+            isProwizjeAut = False
+            isPrzelewObciazenieVat = False
+
             if(header):
                 writer.writerow(["DOK", "WBP", 0,full_statement_number_sequence, full_statement_number_sequence_description,fileData,fileData,fileData,0.00,0,0,"","",0.00,0.00,"","","WBP"])
                 header = False
 
-
             documentNumber = documentNumber.replace('\n', '').replace('\r', '')
             description = description.replace('\n', '').replace('\r', '')
+            # documentNumber = ' '.join(documentNumber.split()).replace('\n', '').replace('\r', '').replace('\t', '')
+            # description = ' '.join(description.split()).replace('\n', '').replace('\r', '').replace('\t', '')
+
+
 
             writer.writerow(["ZAP", 'WN',amount,WN_account,documentNumber,0,description,0])            
             writer.writerow(["ZAK", "MA",amount,MA_account,documentNumber,0,description,0])
 
-            # Tworzenie wierszy ZAP i ZAK
-            # zap_row = ";".join([str("ZAP"), 'WN', str(amount), str(WN_account), str(documentNumber), "0", str(description), "0"])
-            # zak_row = ";".join([str("ZAK"), 'MA', str(amount), str(MA_account), str(documentNumber), "0", str(description), "0"])
-
-            # zap_row = zap_row.replace('\n', '').replace('\r', '')
-            # zak_row = zak_row.replace('\n', '').replace('\r', '')
-
-            # # Zapisz ZAP i ZAK w jednej linii
-            # file.write(zap_row + '\n')  # Zapisujemy ZAP w jednej linii
-            # file.write(zak_row + '\n')  # Zapisujemy ZAK w jednej linii
 
 
 remove_quotes_from_dates('e_dokum.txt')
